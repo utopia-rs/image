@@ -1,0 +1,20 @@
+[package]
+name = "utopia-image"
+description = "Image previews: decode, crop by gravity or focal point, borders, rounded corners, opacity, rotation and background, then encode to JPEG, PNG, GIF, WebP or AVIF."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "BSD-3-Clause"
+
+[dependencies]
+fast_image_resize = { version = "6", default-features = false, features = ["std"] }
+gif = "0.14"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "avif", "rayon"] }
+image-webp = "0.2"
+kamadak-exif = "0.6"
+php-std = { version = "0.1.0", git = "https://github.com/utopia-rs/php-std" }
+png = "0.18"
+thiserror = "2"
+
+[package.metadata.utopia]
+php-sync = "809d2819d7da00d8b2f486e3bcb4c98a5265e950"
