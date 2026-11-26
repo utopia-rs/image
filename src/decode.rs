@@ -8,50 +8,28 @@ use crate::error::{Error, Result};
 use crate::frame::{Format, Frame};
 use crate::options::{canvas_bytes, check_dimensions, check_pixels, pixel_budget};
 
-/// The container a blob's first bytes announce.
-pub(crate) fn sniff(data: &[u8]) -> Option<Format> {
-    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        Some(Format::Jpeg)
-    } else if data.starts_with(b"\x89PNG\r\n\x1a\n") {
-        Some(Format::Png)
-    } else if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
-        Some(Format::Gif)
-    } else if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
-        Some(Format::Webp)
-    } else if data.len() >= 12 && &data[4..8] == b"ftyp" {
-        match &data[8..12] {
-            b"avif" | b"avis" => Some(Format::Avif),
-            b"heic" | b"heix" | b"hevc" | b"hevx" | b"mif1" | b"msf1" | b"heim" | b"heis" => Some(Format::Heic),
-            _ => None,
-        }
-    } else {
-        None
-    }
-}
-
-/// Decodes every frame of `data`, composited onto the full canvas.
-pub(crate) fn decode(data: &[u8]) -> Result<Vec<Frame>> {
-    if data.is_empty() {
-        return Err(Error::imagick("Zero size image string passed"));
-    }
-    let format = sniff(data)
-        .ok_or_else(|| Error::imagick("no decode delegate for this image format `' @ error/blob.c/BlobToImage/479"))?;
+/// Decodes every frame of `data`, which [`Format::detect`] read as
+/// `format`, composited onto the full canvas.
+pub(crate) fn decode(data: &[u8], format: Format) -> Result<Vec<Frame>> {
     let frames = match format {
         Format::Jpeg | Format::Png => single(data, format)?,
         Format::Gif => gif(data)?,
         Format::Webp => webp(data)?,
+        #[cfg(feature = "libheif")]
+        Format::Avif | Format::Heic => crate::heif::decode(data, format)?,
+        #[cfg(not(feature = "libheif"))]
         Format::Avif | Format::Heic => {
-            return Err(Error::imagick(format!("no decode delegate for this image format `{}'", format.magick())));
+            return Err(Error::unavailable(format.magick(), "input"));
         }
     };
     if frames.is_empty() {
-        return Err(Error::imagick(format!("insufficient image data in blob `{}'", format.magick())));
+        return Err(Error::Corrupt(format!("{}: no frames", format.magick())));
     }
     Ok(frames)
 }
 
 fn corrupt(format: Format, e: impl std::fmt::Display) -> Error {
-    Error::imagick(format!("corrupt image `{}': {e}", format.magick()))
+    Error::Corrupt(format!("{}: {e}", format.magick()))
 }
 
 fn single(data: &[u8], format: Format) -> Result<Vec<Frame>> {
@@ -73,7 +51,15 @@ fn single(data: &[u8], format: Format) -> Result<Vec<Frame>> {
     check_pixels(decoded_size.saturating_add(copy))?;
     let decoded = image::DynamicImage::from_decoder(decoder).map_err(|e| corrupt(format, e))?;
     let alpha = decoded.color().has_alpha();
-    Ok(vec![Frame::new(decoded.into_rgba8(), alpha, 0, format)])
+    let mut frame = Frame::new(decoded.into_rgba8(), alpha, 0, format);
+    // ImageMagick keeps the quality and chroma subsampling a JPEG was written
+    // with on the image: an output that sets no quality (`$quality = -1`) is
+    // written at that quality, and a JPEG output with that subsampling.
+    if format == Format::Jpeg {
+        frame.quality = crate::jpeg_source::quality(data);
+        frame.jpeg_sampling = crate::jpeg_source::sampling(data);
+    }
+    Ok(vec![frame])
 }
 
 fn gif(data: &[u8]) -> Result<Vec<Frame>> {

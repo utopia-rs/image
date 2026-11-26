@@ -1,8 +1,5 @@
 # Utopia Image
 
-> [!IMPORTANT]
-> This repository is a read-only mirror of [`crates/utopia/image`](https://github.com/appwrite/appwrite/tree/main/crates/utopia/image) in [appwrite/appwrite](https://github.com/appwrite/appwrite). Development happens there — please open issues and pull requests against appwrite/appwrite.
-
 [![Discord](https://img.shields.io/discord/564160730845151244?label=discord)](https://discord.gg/GSeTUeA)
 
 Image previews: decode, crop by gravity or focal point, borders, rounded corners, opacity, rotation and background, then encode to JPEG, PNG, GIF, WebP or AVIF.
@@ -13,7 +10,7 @@ This library is maintained by the [Appwrite team](https://appwrite.io).
 
 ```toml
 [dependencies]
-utopia-image = { git = "https://github.com/utopia-rs/image" }
+utopia-image = { git = "https://github.com/appwrite/appwrite" }
 ```
 
 `utopia-image` turns an uploaded image into a preview: decode it, crop it, decorate it, and encode it in the format the client asked for. Everything runs in memory on the calling thread; in async code, run it on the blocking pool.
@@ -73,6 +70,22 @@ let dir = std::env::temp_dir().join("utopia-image-guide");
 Image::new(&blob)?.save(dir.join("preview.gif"), OutputFormat::Gif, 75)?;
 assert!(dir.join("preview.gif").exists());
 ```
+
+## Contributing
+
+Development happens in [appwrite/appwrite](https://github.com/appwrite/appwrite), where this crate lives at [`crates/utopia/image`](https://github.com/appwrite/appwrite/tree/main/crates/utopia/image). Run these commands from a checkout of it. The [contributing guide](https://utopia-docs.appwrite.network/contributing) covers each step.
+
+### Test
+
+```bash
+cargo test -p utopia-image
+cargo clippy -p utopia-image --all-targets -- -D warnings
+cargo fmt --all --check
+```
+
+### Compare with PHP
+
+The utopia PHP extension serves this crate as `Utopia\Image\Canvas` and `Utopia\Image\Font`, which have no PHP implementation. `crates/extension/tests/canvas.php` and `packages/image/tests` run on it in the development image (`crates/extension/tests/run.sh`).
 
 ## License
 
